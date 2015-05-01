@@ -25,13 +25,13 @@ public abstract class Program
                     50000,
                     ""
             );
-            s.start();
+            s.run();
         }
         catch(SocketException e)
         {
             Logger.getLogger(Program.class.getName()).log(
                 Level.SEVERE,
-                "Couldn't start server on port " + args[0] + ".",
+                "Couldn't start server on port .",
                 e
             );
         }

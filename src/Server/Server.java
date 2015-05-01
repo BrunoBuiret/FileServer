@@ -38,7 +38,7 @@ public class Server
         this.startDate = new Date();
     }
     
-    public void start()
+    public void run()
     {
         boolean keepListening = true;
         
@@ -61,7 +61,7 @@ public class Server
                 // Decode request packet
                 requestString = new String(requestData, "UTF-8").trim();
                 
-                // Print 
+                // Print the request
                 System.out.println(String.format(
                     "%s:%d %s",
                     requestPacket.getAddress(),
@@ -69,6 +69,7 @@ public class Server
                     requestString
                 ));
                 
+                // Deal with the request
                 if(requestString.equals("USER"))
                 {
                     // Find a free port

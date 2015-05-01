@@ -52,7 +52,7 @@ public class Connection extends Thread
         // Inform the client of the new server port to use
         try
         {
-            byte[] connectionData = ("SERVER" + this.socket.getLocalPort()).getBytes("UTF-8");
+            byte[] connectionData = ("SERVER " + this.socket.getLocalPort()).getBytes("UTF-8");
             DatagramPacket connectionPacket = new DatagramPacket(connectionData, connectionData.length, this.clientAddress, this.clientPort);
             this.socket.send(connectionPacket);
         }
@@ -86,8 +86,17 @@ public class Connection extends Thread
                 
                 // Decode request packet
                 requestString = new String(requestData, "UTF-8").trim();
-                commandString = requestString.substring(requestString.indexOf(" "));
+                commandString = requestString.contains(" ") ? requestString.substring(requestString.indexOf(" ")) : requestString;
                 
+                // Print the request
+                System.out.println(String.format(
+                    "%s:%d %s",
+                    requestPacket.getAddress(),
+                    requestPacket.getPort(),
+                    requestString
+                ));
+                
+                // Deal with the request
                 switch(commandString)
                 {
                     case "LIST":
