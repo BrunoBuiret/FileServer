@@ -5,7 +5,10 @@
  */
 package Server;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -44,7 +47,7 @@ public class Connection extends Thread
         this.clientAddress = clientAddress;
         this.clientPort = clientPort;
         this.startDate = new Date();
-        this.dateFormat = new SimpleDateFormat("yyyy/MM/mm HH:mm:ss");
+        this.dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
     }
     
     public void run()
@@ -86,7 +89,7 @@ public class Connection extends Thread
                 
                 // Decode request packet
                 requestString = new String(requestData, "UTF-8").trim();
-                commandString = requestString.contains(" ") ? requestString.substring(requestString.indexOf(" ")) : requestString;
+                commandString = requestString.contains(" ") ? requestString.substring(0, requestString.indexOf(" ")) : requestString;
                 
                 // Print the request
                 System.out.println(String.format(
@@ -101,13 +104,13 @@ public class Connection extends Thread
                 {
                     case "LIST":
                         // Build the response packet
-                        StringBuilder responseBuilder = new StringBuilder("LIST "); 
-                        List<File> filesList = this.getFilesList();
+                        StringBuilder filesListBuilder = new StringBuilder("LIST "); 
+                        File[] filesList = this.getFilesList();
                         
                         for(File f : filesList)
-                            responseBuilder.append(f.getName()).append(' ');
+                            filesListBuilder.append(f.getName()).append(' ');
                         
-                        responseData = responseBuilder.toString().trim().getBytes("UTF-8");
+                        responseData = filesListBuilder.toString().trim().getBytes("UTF-8");
                         responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
                         
                         // Then, send it
@@ -115,7 +118,74 @@ public class Connection extends Thread
                     break;
                         
                     case "DOWNLOAD":
+                        File downloadedFile = new File(this.server.getFilesDirectory(), requestString.substring(9));
                         
+                        if(downloadedFile.exists())
+                        {
+                            if(downloadedFile.isFile())
+                            {
+                                // First, send the client the file size so that they can prepare for the download
+                                responseData = ("DOWNLOAD " + downloadedFile.length()).getBytes("UTF-8");
+                                responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                                this.socket.send(responsePacket);
+                                
+                                // Then, send the contents of the file
+                                try
+                                {
+                                    BufferedInputStream input = null;
+                                    
+                                    try
+                                    {
+                                        input = new BufferedInputStream(new FileInputStream(downloadedFile));
+                                        int totalReadBytes = 0;
+                                        
+                                        while(totalReadBytes < downloadedFile.length())
+                                        {
+                                            int remainingBytes = (int) downloadedFile.length() - totalReadBytes;
+                                            responseData = new byte[remainingBytes >= 1024 ? 1024 : remainingBytes];
+                                            int readBytes = input.read(responseData, 0, responseData.length);
+                                            
+                                            System.out.println("remainingBytes = " + remainingBytes);
+                                            
+                                            if(readBytes > 0)
+                                            {
+                                                totalReadBytes += readBytes;
+                                                System.out.println(totalReadBytes + " / " + downloadedFile.length());
+                                                
+                                                // Send the file part
+                                                responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                                                this.socket.send(responsePacket);
+                                            }
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        input.close();
+                                    }
+                                }
+                                catch(FileNotFoundException e)
+                                {
+                                    // Send the client an error response
+                                    responseData = ("ERROR file \"" + downloadedFile.getName() + "\" doesn't exist").getBytes("UTF-8");
+                                    responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                                    this.socket.send(responsePacket);
+                                }
+                            }
+                            else
+                            {
+                                // Send the client an error response
+                                responseData = ("ERROR \"" + downloadedFile.getName() + "\" isn't a valid file").getBytes("UTF-8");
+                                responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                                this.socket.send(responsePacket);
+                            }
+                        }
+                        else
+                        {
+                            // Send the client an error response
+                            responseData = ("ERROR file \"" + downloadedFile.getName() + "\" doesn't exist").getBytes("UTF-8");
+                            responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                            this.socket.send(responsePacket);
+                        }
                     break;
                         
                     case "UPLOAD":
@@ -130,7 +200,7 @@ public class Connection extends Thread
                             " " +
                             this.dateFormat.format(this.startDate) +
                             " " +
-                            this.getFilesList().size()
+                            this.getFilesList().length
                         ).getBytes("UTF-8");
                         responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
                         
@@ -139,7 +209,72 @@ public class Connection extends Thread
                     break;
                     
                     case "HELP":
+                        // Build the response packet
+                        StringBuilder helpBuilder = new StringBuilder("HELP ");
                         
+                        if(requestString.equals(commandString))
+                        {
+                            helpBuilder.append("LIST DOWNLOAD UPLOAD STATISTICS HELP QUIT");
+                        }
+                        else
+                        {
+                            String command = requestString.substring(5).toUpperCase();
+                            
+                            switch(command)
+                            {
+                                case "LIST":
+                                    helpBuilder
+                                        .append("LIST")
+                                        .append("\n")
+                                        .append("Prints a list of every available file on the server.");
+                                break;
+                                    
+                                case "DOWNLOAD":
+                                    helpBuilder
+                                        .append("DOWNLOAD <file name>")
+                                        .append("\n")
+                                        .append("Downloads file <file name> from the server.");
+                                break;
+                                    
+                                case "UPLOAD":
+                                    helpBuilder
+                                        .append("UPLOAD <file name>")
+                                        .append("\n")
+                                        .append("Uploads file <file name> on the server.");
+                                break;
+                                    
+                                case "STATISTICS":
+                                    helpBuilder
+                                        .append("STATISTICS")
+                                        .append("\n")
+                                        .append("Prints statistics about the server.");
+                                break;
+                                    
+                                case "HELP":
+                                    helpBuilder
+                                        .append("HELP [command]")
+                                        .append("\n")
+                                        .append("Prints the list of available commands or informations about [command].");
+                                break;
+                                    
+                                case "QUIT":
+                                    helpBuilder
+                                        .append("QUIT")
+                                        .append("\n")
+                                        .append("Closes the connection to the server.");
+                                break;
+                                    
+                                default:
+                                    helpBuilder
+                                        .append("Error: command " + command + " unknown");
+                            }
+                        }
+                        
+                        responseData = helpBuilder.toString().getBytes("UTF-8");
+                        responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                        
+                        // Then, send it
+                        this.socket.send(responsePacket);
                     break;
                         
                     case "QUIT":
@@ -158,7 +293,7 @@ public class Connection extends Thread
             {
                 Logger.getLogger(Connection.class.getName()).log(
                     Level.SEVERE,
-                    null,
+                    "I/O error: " + e.getMessage(),
                     e
                 );
             }
@@ -168,8 +303,8 @@ public class Connection extends Thread
         this.socket.close();
     }
     
-    protected List<File> getFilesList()
+    protected File[] getFilesList()
     {
-        return new ArrayList<File>();
+        return this.server.getFilesDirectory().listFiles(new DownloadableFileFilter());
     }
 }

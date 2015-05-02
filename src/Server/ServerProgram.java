@@ -5,6 +5,7 @@
  */
 package Server;
 
+import java.io.FileNotFoundException;
 import java.net.SocketException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -13,7 +14,7 @@ import java.util.logging.Logger;
  *
  * @author PtitBlond
  */
-public abstract class Program
+public abstract class ServerProgram
 {
     public static void main(String[] args)
     {
@@ -22,16 +23,24 @@ public abstract class Program
             Server s = new Server(
                     args.length >= 1 ? Integer.parseInt(args[0]) : 25000,
                     40000,
-                    50000,
-                    ""
+                    41000,
+                    "D:\\Téléchargements"
             );
             s.run();
         }
         catch(SocketException e)
         {
-            Logger.getLogger(Program.class.getName()).log(
+            Logger.getLogger(ServerProgram.class.getName()).log(
                 Level.SEVERE,
-                "Couldn't start server on port .",
+                "Couldn't start server on port " + args[0] + " : " + e.getMessage() +".",
+                e
+            );
+        }
+        catch(FileNotFoundException|RuntimeException e)
+        {
+            Logger.getLogger(ServerProgram.class.getName()).log(
+                Level.SEVERE,
+                e.getMessage(),
                 e
             );
         }

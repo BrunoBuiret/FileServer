@@ -15,7 +15,7 @@ import java.util.logging.Logger;
  *
  * @author PtitBlond
  */
-public abstract class Program
+public abstract class ClientProgram
 {
     public static void main(String[] args)
     {
@@ -28,11 +28,11 @@ public abstract class Program
             }
             catch(SocketException e)
             {
-                Logger.getLogger(Program.class.getName()).log(Level.SEVERE, null, e);
+                Logger.getLogger(ClientProgram.class.getName()).log(Level.SEVERE, null, e);
             }
             catch(UnknownHostException e)
             {
-                Logger.getLogger(Program.class.getName()).log(Level.SEVERE, null, e);
+                Logger.getLogger(ClientProgram.class.getName()).log(Level.SEVERE, null, e);
             }
         }
         else

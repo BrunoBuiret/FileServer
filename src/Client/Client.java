@@ -5,11 +5,20 @@
  */
 package Client;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -80,8 +89,9 @@ public class Client
             {
                 // Prompt the user to know what they want to do
                 requestString = this.prompt();
-                commandString = requestString.contains(" ") ? requestString.substring(requestString.indexOf(" ")) : requestString;
+                commandString = (requestString.contains(" ") ? requestString.substring(0, requestString.indexOf(" ")) : requestString).toUpperCase();
                 
+                // Request
                 switch(commandString)
                 {
                     case "LIST":
@@ -89,17 +99,22 @@ public class Client
                     case "HELP":
                     case "QUIT":
                         // Build the request packet
-                        requestData = requestString.getBytes("UTF-8");
+                        requestData = requestString.toUpperCase().getBytes("UTF-8");
+                        requestPacket = new DatagramPacket(requestData, requestData.length, this.serverAddress, this.serverPort);
+                        
+                        // Then, send it
+                        this.socket.send(requestPacket);
+                    break;
+                        
+                    case "DOWNLOAD":
+                        // Build the request packet
+                        requestData = (commandString + " " + requestString.substring(9)).getBytes("UTF-8");
                         requestPacket = new DatagramPacket(requestData, requestData.length, this.serverAddress, this.serverPort);
                         
                         // Then, send it
                         this.socket.send(requestPacket);
                     break;
                     
-                    case "DOWNLOAD":
-                        System.out.println("Info: not implemented yet.");
-                    break;
-                        
                     case "UPLOAD":
                         System.out.println("Info: not implemented yet.");
                     break;
@@ -108,6 +123,7 @@ public class Client
                         System.err.println("Error: command " + commandString + " unknown.");
                 }
                 
+                // Response
                 switch(commandString)
                 {
                     case "LIST":
@@ -126,32 +142,108 @@ public class Client
                         for(String file : filesList)
                             filesBuilder.append(file).append(" ");
                         
+                        // Then print it
                         System.out.println("There " + (filesList.length != 1 ? "are" : "is") + " " + filesList.length + " file" + (filesList.length != 1 ? "s" : "") + " available.");
                         System.out.println(filesBuilder.toString());
                     break;
-                        
-                    case "STATISTICS":
-                        // Wait for a response
-                        responseData = new byte[1024];
-                        responsePacket = new DatagramPacket(responseData, 1024);
+                    
+                    case "DOWNLOAD":
+                        // Wait for the file size
+                        responseData = new byte[512];
+                        responsePacket = new DatagramPacket(responseData, 512);
                         this.socket.receive(responsePacket);
                         
                         // Then, decode it
                         responseString = new String(responseData, "UTF-8").trim();
                         
-                        System.out.println(responseString);
-                    break;
-                        
-                    case "HELP":
-                        
-                    break;
-                        
-                    case "DOWNLOAD":
-                        
+                        if(responseString.startsWith("DOWNLOAD"))
+                        {
+                            // Extract the file's size
+                            int totalBytes = Integer.parseInt(responseString.substring(9));
+                            
+                            // Prepare for the download
+                            File finalFile = new File(requestString.substring(9));
+                            File tempFile = new File(requestString.substring(9) + ".part");
+                            BufferedOutputStream output = null;
+                            boolean errorHappened = false;
+                            
+                            try
+                            {
+                                output = new BufferedOutputStream(new FileOutputStream(tempFile));
+                                int totalReadBytes = 0;
+                                
+                                while(totalReadBytes < totalBytes)
+                                {
+                                    int remainingBytes = totalBytes - totalReadBytes;
+                                    
+                                    // Wait for a file part
+                                    responseData = new byte[remainingBytes >= 1024 ? 1024 : remainingBytes];
+                                    responsePacket = new DatagramPacket(responseData, responseData.length);
+                                    this.socket.receive(responsePacket);
+                                    
+                                    // Memorize the size
+                                    totalReadBytes += responseData.length;
+                                    System.out.println(totalReadBytes + " / " + totalBytes);
+                                    
+                                    // Then, put it in the temporary file
+                                    output.write(responseData);
+                                }
+                            }
+                            catch(IOException e)
+                            {
+                                errorHappened = true;
+                                
+                                // Inform the user
+                                System.err.println("Error: " + e.getMessage());
+                            }
+                            finally
+                            {
+                                output.close();
+                            }
+                            
+                            // If no error happened, rename the temporary file
+                            if(!errorHappened)
+                                tempFile.renameTo(finalFile);
+                        }
+                        else if(responseString.startsWith("ERROR"))
+                        {
+                            System.err.println("Error: " + responseString.substring(6));
+                        }
                     break;
                         
                     case "UPLOAD":
                         
+                    break;
+                        
+                    case "STATISTICS":
+                        // Wait for a response
+                        responseData = new byte[512];
+                        responsePacket = new DatagramPacket(responseData, 512);
+                        this.socket.receive(responsePacket);
+                        
+                        // Then, decode it and extract informations
+                        responseString = new String(responseData, "UTF-8").trim();
+                        
+                        String serverUptime = responseString.substring(11, 30);
+                        String connectionUptime = responseString.substring(31, 50);
+                        int filesNumber = Integer.parseInt(responseString.substring(51));
+                        
+                        // Print the statistics
+                        System.out.println("Server has been running since " + serverUptime + ", you have been connected since " + connectionUptime + ".");
+                        System.out.println("There " + (filesNumber != 1 ? "are" : "is") + " " + filesNumber + " file" + (filesNumber != 1 ? "s" : "") + " available.");
+                    break;
+                        
+                    case "HELP":
+                        // Wait for a response
+                        responseData = new byte[512];
+                        responsePacket = new DatagramPacket(responseData, 512);
+                        this.socket.receive(responsePacket);
+                        
+                        // Then, decode it
+                        responseString = new String(responseData, "UTF-8").trim();
+                        
+                        // Print the help
+                        System.out.println(responseString.substring(5));
                     break;
                         
                     case "QUIT":
@@ -167,7 +259,7 @@ public class Client
         {
             Logger.getLogger(Client.class.getName()).log(
                 Level.SEVERE,
-                null,
+                "I/O error: " + e.getMessage(),
                 e
             );
         }
@@ -178,7 +270,15 @@ public class Client
     
     protected String prompt()
     {
-        System.out.print("> ");
-        return this.scanner.nextLine();
+        String command;
+        
+        do
+        {
+            System.out.print("> ");
+            command = this.scanner.nextLine().trim();
+        }
+        while(command.length() == 0);
+        
+        return command;
     }
 }

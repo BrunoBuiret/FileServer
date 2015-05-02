@@ -5,6 +5,8 @@
  */
 package Server;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -25,17 +27,22 @@ public class Server
     
     protected int endPort;
     
-    protected String filesDirectory;
+    protected File filesDirectory;
     
     protected Date startDate;
     
-    public Server(int serverPort, int startPort, int endPort, String filesDirectory) throws SocketException
+    public Server(int serverPort, int startPort, int endPort, String filesDirectory) throws SocketException, FileNotFoundException, RuntimeException
     {
         this.socket = new DatagramSocket(serverPort);
         this.startPort = startPort;
         this.endPort = endPort;
-        this.filesDirectory = filesDirectory;
+        this.filesDirectory = new File(filesDirectory);
         this.startDate = new Date();
+        
+        if(!this.filesDirectory.exists())
+            throw new FileNotFoundException("Directory \"" + this.filesDirectory.getName() + "\" doesn't exist.");
+        else if(!this.filesDirectory.isDirectory())
+            throw new RuntimeException("\"" + this.filesDirectory.getName() + "\" isn't a valid directory.");
     }
     
     public void run()
@@ -101,7 +108,7 @@ public class Server
             {
                 Logger.getLogger(Server.class.getName()).log(
                     Level.SEVERE,
-                    null,
+                    "I/O error: " + e.getMessage(),
                     e
                 );
             }
@@ -114,6 +121,11 @@ public class Server
     public Date getStartDate()
     {
         return this.startDate;
+    }
+    
+    public File getFilesDirectory()
+    {
+        return this.filesDirectory;
     }
     
     protected boolean isPortOpen(int port)
