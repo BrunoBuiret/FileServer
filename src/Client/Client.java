@@ -156,10 +156,10 @@ public class Client
                         // Then, decode it
                         responseString = new String(responseData, "UTF-8").trim();
                         
-                        if(responseString.startsWith("DOWNLOAD"))
+                        if(responseString.startsWith("SIZE"))
                         {
                             // Extract the file's size
-                            int totalBytes = Integer.parseInt(responseString.substring(9));
+                            int totalBytes = Integer.parseInt(responseString.substring(5));
                             
                             // Prepare for the download
                             File finalFile = new File(requestString.substring(9));
@@ -183,7 +183,6 @@ public class Client
                                     
                                     // Memorize the size
                                     totalReadBytes += responseData.length;
-                                    System.out.println(totalReadBytes + " / " + totalBytes);
                                     
                                     // Then, put it in the temporary file
                                     output.write(responseData);
@@ -206,9 +205,15 @@ public class Client
                                 output.close();
                             }
                             
-                            // If no error happened, rename the temporary file
                             if(!errorHappened)
+                            {
+                                // If no error happened, rename the temporary file
                                 tempFile.renameTo(finalFile);
+                                
+                                // And inform the user
+                                System.out.println("\"" + finalFile.getName() +"\" downloaded successfully.");
+                            }
+                            
                         }
                         else if(responseString.startsWith("ERROR"))
                         {
@@ -231,11 +236,18 @@ public class Client
                         
                         String serverUptime = responseString.substring(11, 30);
                         String connectionUptime = responseString.substring(31, 50);
-                        int filesNumber = Integer.parseInt(responseString.substring(51));
+                        String[] statisticsNumbers = responseString.substring(51).split(" ");
+                        int filesNumber = Integer.parseInt(statisticsNumbers[0]);
+                        int usersNumber = Integer.parseInt(statisticsNumbers[1]);
                         
                         // Print the statistics
-                        System.out.println("Server has been running since " + serverUptime + ", you have been connected since " + connectionUptime + ".");
-                        System.out.println("There " + (filesNumber != 1 ? "are" : "is") + " " + filesNumber + " file" + (filesNumber != 1 ? "s" : "") + " available.");
+                        System.out.println(
+                            "Server has been running since " + serverUptime + ", you have been connected since " + connectionUptime + "."
+                        );
+                        System.out.println(
+                            "There " + (filesNumber != 1 ? "are" : "is") + " " + filesNumber + " " + (filesNumber != 1 ? "files" : "file") +
+                            " available and " + usersNumber + " " + (usersNumber > 1 ? "users" : "user") + " " + (usersNumber > 1 ? "are" : "is") + " connected."
+                        );
                     break;
                         
                     case "HELP":

@@ -31,6 +31,8 @@ public class Server
     
     protected Date startDate;
     
+    protected int connectionsNumber;
+    
     public Server(int serverPort, int startPort, int endPort, String filesDirectory) throws SocketException, FileNotFoundException, RuntimeException
     {
         this.socket = new DatagramSocket(serverPort);
@@ -38,6 +40,7 @@ public class Server
         this.endPort = endPort;
         this.filesDirectory = new File(filesDirectory);
         this.startDate = new Date();
+        this.connectionsNumber = 0;
         
         if(!this.filesDirectory.exists())
             throw new FileNotFoundException("Directory \"" + this.filesDirectory.getName() + "\" doesn't exist.");
@@ -87,6 +90,7 @@ public class Server
                     {
                         Connection c = new Connection(this, serverPort, requestPacket.getAddress(), requestPacket.getPort());
                         c.start();
+                        this.connectionsNumber++;
                     }
                     else
                     {
@@ -126,6 +130,16 @@ public class Server
     public File getFilesDirectory()
     {
         return this.filesDirectory;
+    }
+    
+    public int getConnectionsNumber()
+    {
+        return this.connectionsNumber;
+    }
+    
+    public void decreaseConnectionsNumber()
+    {
+        this.connectionsNumber--;
     }
     
     protected boolean isPortOpen(int port)

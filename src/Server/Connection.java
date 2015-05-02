@@ -125,7 +125,7 @@ public class Connection extends Thread
                             if(downloadedFile.isFile())
                             {
                                 // First, send the client the file size so that they can prepare for the download
-                                responseData = ("DOWNLOAD " + downloadedFile.length()).getBytes("UTF-8");
+                                responseData = ("SIZE " + downloadedFile.length()).getBytes("UTF-8");
                                 responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
                                 this.socket.send(responsePacket);
                                 
@@ -139,6 +139,7 @@ public class Connection extends Thread
                                         input = new BufferedInputStream(new FileInputStream(downloadedFile));
                                         int totalReadBytes = 0;
                                         boolean errorHappened = false;
+                                        this.socket.setSoTimeout(10);
                                         
                                         while(totalReadBytes < downloadedFile.length() && !errorHappened)
                                         {
@@ -146,12 +147,9 @@ public class Connection extends Thread
                                             responseData = new byte[remainingBytes >= 1024 ? 1024 : remainingBytes];
                                             int readBytes = input.read(responseData, 0, responseData.length);
                                             
-                                            System.out.println("remainingBytes = " + remainingBytes);
-                                            
                                             if(readBytes > 0)
                                             {
                                                 totalReadBytes += readBytes;
-                                                System.out.println(totalReadBytes + " / " + downloadedFile.length());
                                                 
                                                 // Send the file part
                                                 responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
@@ -173,6 +171,7 @@ public class Connection extends Thread
                                     finally
                                     {
                                         input.close();
+                                        this.socket.setSoTimeout(0);
                                     }
                                 }
                                 catch(FileNotFoundException e)
@@ -212,7 +211,9 @@ public class Connection extends Thread
                             " " +
                             this.dateFormat.format(this.startDate) +
                             " " +
-                            this.getFilesList().length
+                            this.getFilesList().length +
+                            " " +
+                            this.server.getConnectionsNumber()
                         ).getBytes("UTF-8");
                         responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
                         
@@ -313,6 +314,9 @@ public class Connection extends Thread
         
         // Close the socket
         this.socket.close();
+        
+        // Decrease connections number
+        this.server.decreaseConnectionsNumber();
     }
     
     protected File[] getFilesList()
