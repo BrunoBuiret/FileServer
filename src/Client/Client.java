@@ -187,6 +187,11 @@ public class Client
                                     
                                     // Then, put it in the temporary file
                                     output.write(responseData);
+                                    
+                                    // Acknowledge the data
+                                    requestData = ("ACK " + responseData.length).getBytes("UTF-8");
+                                    requestPacket = new DatagramPacket(requestData, requestData.length, this.serverAddress, this.serverPort);
+                                    this.socket.send(requestPacket);
                                 }
                             }
                             catch(IOException e)

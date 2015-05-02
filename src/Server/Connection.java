@@ -138,8 +138,9 @@ public class Connection extends Thread
                                     {
                                         input = new BufferedInputStream(new FileInputStream(downloadedFile));
                                         int totalReadBytes = 0;
+                                        boolean errorHappened = false;
                                         
-                                        while(totalReadBytes < downloadedFile.length())
+                                        while(totalReadBytes < downloadedFile.length() && !errorHappened)
                                         {
                                             int remainingBytes = (int) downloadedFile.length() - totalReadBytes;
                                             responseData = new byte[remainingBytes >= 1024 ? 1024 : remainingBytes];
@@ -155,6 +156,17 @@ public class Connection extends Thread
                                                 // Send the file part
                                                 responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
                                                 this.socket.send(responsePacket);
+                                                
+                                                // Wait for the acknowledgment
+                                                requestData = new byte[512];
+                                                requestPacket = new DatagramPacket(requestData, 512);
+                                                this.socket.receive(requestPacket);
+                                                
+                                                // Is the sent data's size the same as the read one
+                                                requestString = new String(requestData, "UTF-8").trim();
+                                                
+                                                if(Integer.parseInt(requestString.substring(4)) != readBytes)
+                                                    errorHappened = true;
                                             }
                                         }
                                     }
