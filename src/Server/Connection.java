@@ -6,9 +6,11 @@
 package Server;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -122,7 +124,7 @@ public class Connection extends Thread
                         
                         if(downloadedFile.exists())
                         {
-                            if(downloadedFile.isFile())
+                            if(downloadedFile.isFile() && downloadedFile.canRead())
                             {
                                 // First, send the client the file size so that they can prepare for the download
                                 responseData = ("SIZE " + downloadedFile.length()).getBytes("UTF-8");
@@ -160,10 +162,10 @@ public class Connection extends Thread
                                                 requestPacket = new DatagramPacket(requestData, 512);
                                                 this.socket.receive(requestPacket);
                                                 
-                                                // Is the sent data's size the same as the read one
+                                                // Is the sent data's size the same as the read one ?
                                                 requestString = new String(requestData, "UTF-8").trim();
                                                 
-                                                if(Integer.parseInt(requestString.substring(4)) != readBytes)
+                                                if(requestString.startsWith("ACK") && Integer.parseInt(requestString.substring(4)) != readBytes)
                                                     errorHappened = true;
                                             }
                                         }
@@ -200,7 +202,63 @@ public class Connection extends Thread
                     break;
                         
                     case "UPLOAD":
+                        // Initialize the file
+                        int totalBytes = Integer.parseInt(requestString.substring(7, requestString.indexOf(" ", 7)));
+                        File finalFile = new File(requestString.substring(requestString.indexOf(" ", 7) + 1));
+                        File tempFile = new File(finalFile.getName() + ".part");
+                        BufferedOutputStream output = null;
+                        boolean errorHappened = false;
                         
+                        try
+                        {
+                            // Open temporary file
+                            output = new BufferedOutputStream(new FileOutputStream(tempFile));
+                            int totalReadBytes = 0;
+                            
+                            // Notice the client
+                            responseData = "READY".getBytes("UTF-8");
+                            responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                            this.socket.send(responsePacket);
+                            
+                            // Wait for the contents of the file
+                            while(totalReadBytes < totalBytes)
+                            {
+                                int remainingBytes = totalBytes - totalReadBytes;
+
+                                // Wait for a file part
+                                requestData = new byte[remainingBytes >= 1024 ? 1024 : remainingBytes];
+                                requestPacket = new DatagramPacket(requestData, requestData.length);
+                                this.socket.receive(requestPacket);
+                                
+                                // Memorize the size
+                                totalReadBytes += requestData.length;
+
+                                // Then, put it in the temporary file
+                                output.write(requestData);
+                                
+                                // Acknowledge the data
+                                responseData = ("ACK " + requestData.length).getBytes("UTF-8");
+                                responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
+                                this.socket.send(responsePacket);
+                            }
+                        }
+                        catch(IOException e)
+                        {
+                            errorHappened = true;
+                        }
+                        finally
+                        {
+                            output.close();
+                        }
+                        
+                        if(!errorHappened)
+                        {
+                            tempFile.renameTo(finalFile);
+                        }
+                        else
+                        {
+                            tempFile.delete();
+                        }
                     break;
                         
                     case "STATISTICS":

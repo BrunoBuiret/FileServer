@@ -5,8 +5,11 @@
  */
 package Client;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -116,7 +119,30 @@ public class Client
                     break;
                     
                     case "UPLOAD":
-                        System.out.println("Info: not implemented yet.");
+                        File uploadingFile = new File(requestString.substring(7));
+                        
+                        if(uploadingFile.exists())
+                        {
+                            if(uploadingFile.isFile() && uploadingFile.canRead())
+                            {
+                                // Build the request packet
+                                requestData = (commandString + " " + uploadingFile.length() + " " + uploadingFile.getName()).getBytes("UTF-8");
+                                requestPacket = new DatagramPacket(requestData, requestData.length, this.serverAddress, this.serverPort);
+                                
+                                // Then, send it
+                                this.socket.send(requestPacket);
+                            }
+                            else
+                            {
+                                System.err.println("Error: \"" + uploadingFile.getName() + "\" isn't a valid file.");
+                                commandString = "";
+                            }
+                        }
+                        else
+                        {
+                            System.err.println("Error: \"" + uploadingFile.getName() + "\" doesn't exist.");
+                            commandString = "";
+                        }
                     break;
                         
                     default:
@@ -213,6 +239,9 @@ public class Client
                                 // And inform the user
                                 System.out.println("\"" + finalFile.getName() +"\" downloaded successfully.");
                             }
+                            {
+                                tempFile.delete();
+                            }
                             
                         }
                         else if(responseString.startsWith("ERROR"))
@@ -222,7 +251,67 @@ public class Client
                     break;
                         
                     case "UPLOAD":
+                        // Wait for the server to be ready
+                        responseData = new byte[512];
+                        responsePacket = new DatagramPacket(responseData, 512);
+                        this.socket.receive(responsePacket);
                         
+                        // Then, decode it
+                        responseString = new String(responseData, "UTF-8").trim();
+                        
+                        if(responseString.startsWith("READY"))
+                        {
+                            File uploadingFile = new File(requestString.substring(7));
+                            
+                            try
+                            {
+                                BufferedInputStream input = null;
+                                
+                                try
+                                {
+                                    input = new BufferedInputStream(new FileInputStream(uploadingFile));
+                                    int totalReadBytes = 0;
+                                    boolean errorHappened = false;
+                                    this.socket.setSoTimeout(10);
+
+                                    while(totalReadBytes < uploadingFile.length() && !errorHappened)
+                                    {
+                                        int remainingBytes = (int) uploadingFile.length() - totalReadBytes;
+                                        requestData = new byte[remainingBytes >= 1024 ? 1024 : remainingBytes];
+                                        int readBytes = input.read(requestData, 0, requestData.length);
+
+                                        if(readBytes > 0)
+                                        {
+                                            totalReadBytes += readBytes;
+
+                                            // Send the file part
+                                            requestPacket = new DatagramPacket(requestData, requestData.length, this.serverAddress, this.serverPort);
+                                            this.socket.send(requestPacket);
+
+                                            // Wait for the acknowledgment
+                                            responseData = new byte[512];
+                                            responsePacket = new DatagramPacket(responseData, responseData.length);
+                                            this.socket.receive(responsePacket);
+
+                                            // Is the sent data's size the same as the read one ?
+                                            responseString = new String(responseData, "UTF-8").trim();
+
+                                            if(responseString.startsWith("ACK") && Integer.parseInt(responseString.substring(4)) != readBytes)
+                                                    errorHappened = true;
+                                        }
+                                    }
+                                }
+                                finally
+                                {
+                                    input.close();
+                                    this.socket.setSoTimeout(0);
+                                }
+                            }
+                            catch(FileNotFoundException e)
+                            {
+                                System.err.println("Error: \"" + uploadingFile.getName() + "\" doesn't exist anymore.");
+                            }
+                        }
                     break;
                         
                     case "STATISTICS":
@@ -267,8 +356,6 @@ public class Client
                         // Stop looping
                         keepListening = false;
                     break;
-                        
-                    default:
                 }
             }
         }
