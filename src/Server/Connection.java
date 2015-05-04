@@ -17,9 +17,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -110,7 +108,8 @@ public class Connection extends Thread
                         File[] filesList = this.getFilesList();
                         
                         for(File f : filesList)
-                            filesListBuilder.append(f.getName()).append(' ');
+                            filesListBuilder.append(f.getName()).append('/');
+                        filesListBuilder.substring(0, filesListBuilder.length() - 2);
                         
                         responseData = filesListBuilder.toString().trim().getBytes("UTF-8");
                         responsePacket = new DatagramPacket(responseData, responseData.length, this.clientAddress, this.clientPort);
@@ -204,8 +203,8 @@ public class Connection extends Thread
                     case "UPLOAD":
                         // Initialize the file
                         int totalBytes = Integer.parseInt(requestString.substring(7, requestString.indexOf(" ", 7)));
-                        File finalFile = new File(requestString.substring(requestString.indexOf(" ", 7) + 1));
-                        File tempFile = new File(finalFile.getName() + ".part");
+                        File finalFile = new File(this.server.getFilesDirectory(), requestString.substring(requestString.indexOf(" ", 7) + 1));
+                        File tempFile = new File(finalFile.getAbsolutePath() + ".part");
                         BufferedOutputStream output = null;
                         boolean errorHappened = false;
                         

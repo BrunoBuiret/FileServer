@@ -12,16 +12,10 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -162,7 +156,7 @@ public class Client
                         responseString = new String(responseData, "UTF-8").trim();
                         
                         // Build the list of files
-                        String[] filesList = responseString.contains(" ") ? responseString.substring(5).split(" ") : new String[0];
+                        String[] filesList = responseString.length() > 5 ? responseString.substring(5).split("/") : new String[0];
                         StringBuilder filesBuilder = new StringBuilder();
                         
                         for(String file : filesList)

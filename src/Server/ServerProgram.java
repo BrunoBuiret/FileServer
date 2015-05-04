@@ -18,31 +18,38 @@ public abstract class ServerProgram
 {
     public static void main(String[] args)
     {
-        try
+        if(args.length >= 4)
         {
-            Server s = new Server(
-                    args.length >= 1 ? Integer.parseInt(args[0]) : 25000,
-                    40000,
-                    41000,
-                    "D:\\Téléchargements"
-            );
-            s.run();
+            try
+            {
+                Server s = new Server(
+                    Integer.parseInt(args[0]),
+                    Integer.parseInt(args[1]),
+                    Integer.parseInt(args[2]),
+                    args[3]
+                );
+                s.run();
+            }
+            catch(SocketException e)
+            {
+                Logger.getLogger(ServerProgram.class.getName()).log(
+                    Level.SEVERE,
+                    "Couldn't start server on port " + args[0] + " : " + e.getMessage() +".",
+                    e
+                );
+            }
+            catch(FileNotFoundException|RuntimeException e)
+            {
+                Logger.getLogger(ServerProgram.class.getName()).log(
+                    Level.SEVERE,
+                    e.getMessage(),
+                    e
+                );
+            }
         }
-        catch(SocketException e)
+        else
         {
-            Logger.getLogger(ServerProgram.class.getName()).log(
-                Level.SEVERE,
-                "Couldn't start server on port " + args[0] + " : " + e.getMessage() +".",
-                e
-            );
-        }
-        catch(FileNotFoundException|RuntimeException e)
-        {
-            Logger.getLogger(ServerProgram.class.getName()).log(
-                Level.SEVERE,
-                e.getMessage(),
-                e
-            );
+            System.err.println("Error: you must provide server port, ports range and files directory.");
         }
     }
 }
