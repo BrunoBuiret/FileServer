@@ -9,8 +9,7 @@ import java.io.File;
 import java.io.FileFilter;
 
 /**
- *
- * @author PtitBlond
+ * @author Bruno Buiret
  */
 public class DownloadableFileFilter implements FileFilter
 {
